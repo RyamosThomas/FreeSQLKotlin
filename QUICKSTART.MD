@@ -13,10 +13,12 @@ dependencyResolutionManagement {
         maven("https://jitpack.io")
     }
 }
+```
 
+```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("com.github.YOUR_USER:FreeSQLKotlin:0.1.0")
+    implementation("com.github.RyamosThomas:FreeSQLKotlin:0.1.0")
 }
 ```
 
