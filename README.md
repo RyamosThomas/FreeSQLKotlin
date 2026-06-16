@@ -166,3 +166,7 @@ See `examples/src/main/kotlin/freesql/examples/`:
 ## License
 
 MIT
+
+## AI Disclosure
+💩 100% AI Slop 💩
+this was used as a quick test of the MiMo-V2.5-Pro-UltraSpeed model, execution time was around 1 hour and was 90 million tokens total.
