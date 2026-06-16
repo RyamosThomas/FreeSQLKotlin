@@ -1,0 +1,15 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+*.iml
+.idea/
+out/
+
+# C# FreeSQL reference repo (not part of this project)
+freeSQL_Source/
+
+# Hermes agent workspace
+.hermes/
