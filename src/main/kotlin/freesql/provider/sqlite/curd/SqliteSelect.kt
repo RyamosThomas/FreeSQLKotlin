@@ -3,9 +3,9 @@ package freesql.provider.sqlite.curd
 import freesql.core.*
 import freesql.model.TableInfo
 import freesql.provider.sqlite.*
-import java.sql.ResultSet
 import kotlin.reflect.KClass
 import kotlin.reflect.KMutableProperty1
+import kotlin.reflect.KParameter
 import kotlin.reflect.full.memberProperties
 import kotlin.reflect.full.primaryConstructor
 
@@ -25,7 +25,7 @@ import kotlin.reflect.full.primaryConstructor
  */
 class SqliteSelect<T : Any>(
     private val entityType: KClass<T>,
-    private val ado: SqliteAdo,
+    private val ado: IAdo,
     private val utils: SqliteUtils,
     private val expression: SqliteExpression,
     private val codeFirst: SqliteCodeFirst,
@@ -264,9 +264,9 @@ class SqliteSelect<T : Any>(
         val allParams = getAllParams()
         ado.aop?.curdBefore?.invoke(CurdBeforeEventArgs(sql, allParams))
         val results = mutableListOf<T>()
-        ado.executeReader(sql, allParams) { rs ->
-            while (rs.next()) {
-                results.add(mapRow(rs))
+        ado.executeReader(sql, allParams) { cursor ->
+            while (cursor.next()) {
+                results.add(mapRow(cursor))
             }
         }
         if (includeManys.isNotEmpty()) {
@@ -280,9 +280,9 @@ class SqliteSelect<T : Any>(
         takeCount = 1
         val sql = buildSql()
         var result: T? = null
-        ado.executeReader(sql, getAllParams()) { rs ->
-            if (rs.next()) {
-                result = mapRow(rs)
+        ado.executeReader(sql, getAllParams()) { cursor ->
+            if (cursor.next()) {
+                result = mapRow(cursor)
             }
         }
         return result
@@ -309,10 +309,10 @@ class SqliteSelect<T : Any>(
         selectColumnsOverride = originalOverride
 
         val results = mutableListOf<TColumn>()
-        ado.executeReader(sql, getAllParams()) { rs ->
-            while (rs.next()) {
+        ado.executeReader(sql, getAllParams()) { cursor ->
+            while (cursor.next()) {
                 @Suppress("UNCHECKED_CAST")
-                results.add(rs.getObject(1) as TColumn)
+                results.add(cursor.getObject(1) as TColumn)
             }
         }
         return results
@@ -487,23 +487,28 @@ class SqliteSelect<T : Any>(
 
     // --- Row mapping ---
 
-    private fun mapRow(rs: ResultSet): T {
+    private fun mapRow(cursor: FreeSqlCursor): T {
         val columns = table.columns.filter { !it.isIgnore }
         val constructor = entityType.primaryConstructor
             ?: entityType.constructors.firstOrNull()
             ?: throw IllegalStateException("No constructor found for ${entityType.simpleName}")
 
-        val args = constructor.parameters.map { param ->
+        val args = mutableMapOf<KParameter, Any?>()
+        for (param in constructor.parameters) {
             val col = columns.find { it.csName == param.name }
             if (col != null) {
                 val colIndex = columns.indexOf(col) + 1
-                utils.readValue(rs, colIndex, col.csType)
-            } else {
-                null
+                val value = utils.readValue(cursor, colIndex, col.csType)
+                if (value != null) {
+                    args[param] = value
+                } else if (param.type.isMarkedNullable) {
+                    args[param] = null
+                }
+                // else: null for non-nullable param with a default — omit, let Kotlin fill default
             }
+            // else: column not in result set — omit, let Kotlin fill default
         }
-
-        return constructor.call(*args.toTypedArray())
+        return constructor.callBy(args)
     }
 
     // --- Navigation loading ---
@@ -547,8 +552,8 @@ class SqliteSelect<T : Any>(
             append(" IN (${fkValues.joinToString(", ") { utils.formatSqlValue(it) }})")
         }
 
-        val childEntities = ado.executeArray(sql, emptyMap()) { rs ->
-            mapRowToType(rs, ref.refEntityType, refTable)
+        val childEntities = ado.executeArray(sql, emptyMap()) { cursor ->
+            mapRowToType(cursor, ref.refEntityType, refTable)
         }
 
         // Assign children to parents via reflection
@@ -575,23 +580,28 @@ class SqliteSelect<T : Any>(
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun <R : Any> mapRowToType(rs: ResultSet, type: KClass<R>, tableInfo: TableInfo): R {
+    private fun <R : Any> mapRowToType(cursor: FreeSqlCursor, type: KClass<R>, tableInfo: TableInfo): R {
         val columns = tableInfo.columns.filter { !it.isIgnore }
         val constructor = type.primaryConstructor
             ?: type.constructors.firstOrNull()
             ?: throw IllegalStateException("No constructor found for ${type.simpleName}")
 
-        val args = constructor.parameters.map { param ->
+        val args = mutableMapOf<KParameter, Any?>()
+        for (param in constructor.parameters) {
             val col = columns.find { it.csName == param.name }
             if (col != null) {
                 val colIndex = columns.indexOf(col) + 1
-                utils.readValue(rs, colIndex, col.csType)
-            } else {
-                null
+                val value = utils.readValue(cursor, colIndex, col.csType)
+                if (value != null) {
+                    args[param] = value
+                } else if (param.type.isMarkedNullable) {
+                    args[param] = null
+                }
+                // else: null for non-nullable param with a default — omit, let Kotlin fill default
             }
+            // else: column not in result set — omit, let Kotlin fill default
         }
-
-        return constructor.call(*args.toTypedArray())
+        return constructor.callBy(args)
     }
 
     // --- Helper class ---

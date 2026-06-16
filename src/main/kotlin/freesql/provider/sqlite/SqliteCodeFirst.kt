@@ -4,9 +4,10 @@ import freesql.annotation.Column
 import freesql.annotation.Index
 import freesql.annotation.ServerTimeType
 import freesql.annotation.Table
+import freesql.core.FreeSqlCursor
+import freesql.core.IAdo
 import freesql.core.ICodeFirst
 import freesql.model.*
-import java.sql.ResultSet
 import kotlin.reflect.KClass
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.isSubclassOf
@@ -17,7 +18,7 @@ import kotlin.reflect.full.memberProperties
  * Port of FreeSql SqliteCodeFirst.
  */
 class SqliteCodeFirst(
-    private val ado: SqliteAdo,
+    private val ado: IAdo,
     private val utils: SqliteUtils
 ) : ICodeFirst {
 
@@ -403,15 +404,20 @@ class SqliteCodeFirst(
 
     private fun getExistingColumns(tableName: String): Map<String, Map<String, Any?>> {
         val columns = mutableMapOf<String, MutableMap<String, Any?>>()
-        ado.executeReader("PRAGMA table_info(${utils.quoteSqlName(tableName)})") { rs: ResultSet ->
-            while (rs.next()) {
-                val colName = rs.getString("name")
+        ado.executeReader("PRAGMA table_info(${utils.quoteSqlName(tableName)})") { cursor: FreeSqlCursor ->
+            val nameIndex = cursor.getColumnIndex("name")
+            val typeIndex = cursor.getColumnIndex("type")
+            val notnullIndex = cursor.getColumnIndex("notnull")
+            val dfltValueIndex = cursor.getColumnIndex("dflt_value")
+            val pkIndex = cursor.getColumnIndex("pk")
+            while (cursor.next()) {
+                val colName = cursor.getString(nameIndex) ?: ""
                 columns[colName] = mutableMapOf(
                     "name" to colName,
-                    "type" to rs.getString("type"),
-                    "notnull" to rs.getInt("notnull"),
-                    "dflt_value" to rs.getString("dflt_value"),
-                    "pk" to rs.getInt("pk")
+                    "type" to cursor.getString(typeIndex),
+                    "notnull" to cursor.getInt(notnullIndex),
+                    "dflt_value" to cursor.getString(dfltValueIndex),
+                    "pk" to cursor.getInt(pkIndex)
                 )
             }
         }
@@ -423,9 +429,10 @@ class SqliteCodeFirst(
      */
     private fun getExistingIndexes(tableName: String): Set<String> {
         val indexNames = mutableSetOf<String>()
-        ado.executeReader("PRAGMA index_list(${utils.quoteSqlName(tableName)})") { rs: ResultSet ->
-            while (rs.next()) {
-                val indexName = rs.getString("name")
+        ado.executeReader("PRAGMA index_list(${utils.quoteSqlName(tableName)})") { cursor: FreeSqlCursor ->
+            val nameIndex = cursor.getColumnIndex("name")
+            while (cursor.next()) {
+                val indexName = cursor.getString(nameIndex) ?: ""
                 if (!indexName.startsWith("sqlite_") && !indexName.startsWith("autoindex")) {
                     indexNames.add(indexName)
                 }

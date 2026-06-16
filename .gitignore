@@ -13,3 +13,4 @@ freeSQL_Source/
 
 # Hermes agent workspace
 .hermes/
+local.properties

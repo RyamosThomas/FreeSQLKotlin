@@ -19,7 +19,7 @@ import kotlin.reflect.full.memberProperties
  */
 class SqliteDelete<T : Any>(
     private val entityType: KClass<T>,
-    private val ado: SqliteAdo,
+    private val ado: IAdo,
     private val utils: SqliteUtils,
     private val codeFirst: SqliteCodeFirst
 ) : IDelete<T> {

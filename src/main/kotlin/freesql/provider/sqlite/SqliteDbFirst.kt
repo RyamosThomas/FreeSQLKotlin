@@ -1,5 +1,7 @@
 package freesql.provider.sqlite
 
+import freesql.core.FreeSqlCursor
+import freesql.core.IAdo
 import freesql.core.*
 
 /**
@@ -12,15 +14,16 @@ import freesql.core.*
  * All comment fields in DbColumnInfo/DbTableInfo will be empty for SQLite.
  */
 class SqliteDbFirst(
-    private val ado: SqliteAdo,
+    private val ado: IAdo,
     private val utils: SqliteUtils
 ) : IDbFirst {
 
     override fun getDatabases(): List<String> {
         val databases = mutableListOf<String>()
-        ado.executeReader("PRAGMA database_list") { rs ->
-            while (rs.next()) {
-                databases.add(rs.getString("name"))
+        ado.executeReader("PRAGMA database_list") { cursor ->
+            val nameIndex = cursor.getColumnIndex("name")
+            while (cursor.next()) {
+                databases.add(cursor.getString(nameIndex) ?: "")
             }
         }
         return databases
@@ -41,9 +44,10 @@ class SqliteDbFirst(
         val tableNames = mutableListOf<String>()
         ado.executeReader(
             "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
-        ) { rs ->
-            while (rs.next()) {
-                tableNames.add(rs.getString("name"))
+        ) { cursor ->
+            val nameIndex = cursor.getColumnIndex("name")
+            while (cursor.next()) {
+                tableNames.add(cursor.getString(nameIndex) ?: "")
             }
         }
 
@@ -52,13 +56,18 @@ class SqliteDbFirst(
             val table = DbTableInfo(name = tableName, comment = "")
 
             // Get columns via PRAGMA table_info
-            ado.executeReader("PRAGMA table_info(${utils.quoteSqlName(tableName)})") { rs ->
-                while (rs.next()) {
-                    val colName = rs.getString("name")
-                    val colType = rs.getString("type") ?: ""
-                    val notNull = rs.getInt("notnull") == 1
-                    val defaultVal = rs.getString("dflt_value") ?: ""
-                    val pk = rs.getInt("pk")
+            ado.executeReader("PRAGMA table_info(${utils.quoteSqlName(tableName)})") { cursor ->
+                val nameIdx = cursor.getColumnIndex("name")
+                val typeIdx = cursor.getColumnIndex("type")
+                val notnullIdx = cursor.getColumnIndex("notnull")
+                val dfltValueIdx = cursor.getColumnIndex("dflt_value")
+                val pkIdx = cursor.getColumnIndex("pk")
+                while (cursor.next()) {
+                    val colName = cursor.getString(nameIdx) ?: ""
+                    val colType = cursor.getString(typeIdx) ?: ""
+                    val notNull = cursor.getInt(notnullIdx) == 1
+                    val defaultVal = cursor.getString(dfltValueIdx) ?: ""
+                    val pk = cursor.getInt(pkIdx)
 
                     // Detect Kotlin type from SQLite type
                     getKotlinTypeWithEnumCheck(colType) // enum detection for future use
@@ -100,16 +109,19 @@ class SqliteDbFirst(
             }
 
             // Get indexes
-            ado.executeReader("PRAGMA index_list(${utils.quoteSqlName(tableName)})") { rs ->
-                while (rs.next()) {
-                    val indexName = rs.getString("name")
-                    val unique = rs.getInt("unique") == 1
+            ado.executeReader("PRAGMA index_list(${utils.quoteSqlName(tableName)})") { cursor ->
+                val nameIdx = cursor.getColumnIndex("name")
+                val uniqueIdx = cursor.getColumnIndex("unique")
+                while (cursor.next()) {
+                    val indexName = cursor.getString(nameIdx) ?: ""
+                    val unique = cursor.getInt(uniqueIdx) == 1
                     if (indexName.startsWith("sqlite_")) continue
 
                     val indexCols = mutableListOf<String>()
-                    ado.executeReader("PRAGMA index_info(${utils.quoteSqlName(indexName)})") { idxRs ->
-                        while (idxRs.next()) {
-                            indexCols.add(idxRs.getString("name"))
+                    ado.executeReader("PRAGMA index_info(${utils.quoteSqlName(indexName)})") { idxCursor ->
+                        val idxNameIdx = idxCursor.getColumnIndex("name")
+                        while (idxCursor.next()) {
+                            indexCols.add(idxCursor.getString(idxNameIdx) ?: "")
                         }
                     }
                     table.indexes.add(DbIndexInfo(
@@ -121,13 +133,19 @@ class SqliteDbFirst(
             }
 
             // Get foreign keys
-            ado.executeReader("PRAGMA foreign_key_list(${utils.quoteSqlName(tableName)})") { rs ->
-                while (rs.next()) {
+            ado.executeReader("PRAGMA foreign_key_list(${utils.quoteSqlName(tableName)})") { cursor ->
+                val fromIdx = cursor.getColumnIndex("from")
+                val tableIdx = cursor.getColumnIndex("table")
+                val toIdx = cursor.getColumnIndex("to")
+                while (cursor.next()) {
+                    val fromCol = cursor.getString(fromIdx) ?: ""
+                    val refTable = cursor.getString(tableIdx) ?: ""
+                    val refColumn = cursor.getString(toIdx) ?: ""
                     table.foreignKeys.add(DbForeignKeyInfo(
-                        name = "FK_${tableName}_${rs.getString("from")}_${rs.getString("table")}",
-                        column = rs.getString("from"),
-                        refTable = rs.getString("table"),
-                        refColumn = rs.getString("to")
+                        name = "FK_${tableName}_${fromCol}_${refTable}",
+                        column = fromCol,
+                        refTable = refTable,
+                        refColumn = refColumn
                     ))
                 }
             }

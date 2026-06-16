@@ -81,7 +81,7 @@ open class TableColumns<T : Any>(
     fun subQuery(sql: String): SubQueryExpr = SubQueryExpr(sql)
 
     /** Wildcard: all columns. */
-    val `*`: ColumnRef<Any?> get() = ColumnRef("*", this.tableName)
+    val allColumns: ColumnRef<Any?> get() = ColumnRef("*", this.tableName)
 
     /** Build the TableInfo from annotations. */
     fun buildTableInfo(): TableInfo {

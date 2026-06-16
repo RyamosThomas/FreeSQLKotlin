@@ -1,5 +1,7 @@
 plugins {
     kotlin("jvm") version "1.9.24"
+    id("com.android.library") version "8.7.3" apply false
+    kotlin("android") version "1.9.24" apply false
     application
 }
 
@@ -7,6 +9,7 @@ group = "io.freesql"
 version = "0.1.0"
 
 repositories {
+    google()
     mavenCentral()
 }
 

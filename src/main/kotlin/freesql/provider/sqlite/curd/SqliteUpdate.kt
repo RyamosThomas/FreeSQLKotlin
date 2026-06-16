@@ -26,7 +26,7 @@ import kotlin.reflect.full.primaryConstructor
  */
 class SqliteUpdate<T : Any>(
     private val entityType: KClass<T>,
-    private val ado: SqliteAdo,
+    private val ado: IAdo,
     private val utils: SqliteUtils,
     private val codeFirst: SqliteCodeFirst
 ) : IUpdate<T> {

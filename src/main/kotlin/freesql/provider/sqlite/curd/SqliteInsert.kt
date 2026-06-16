@@ -2,6 +2,7 @@ package freesql.provider.sqlite.curd
 
 import freesql.annotation.ServerTimeType
 import freesql.core.ColumnRef
+import freesql.core.IAdo
 import freesql.core.IInsert
 import freesql.model.TableInfo
 import freesql.provider.sqlite.*
@@ -22,7 +23,7 @@ import kotlin.reflect.full.memberProperties
  */
 class SqliteInsert<T : Any>(
     private val entityType: KClass<T>,
-    private val ado: SqliteAdo,
+    private val ado: IAdo,
     private val utils: SqliteUtils,
     private val codeFirst: SqliteCodeFirst
 ) : IInsert<T> {

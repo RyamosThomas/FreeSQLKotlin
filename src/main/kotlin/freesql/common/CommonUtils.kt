@@ -1,9 +1,9 @@
 package freesql.common
 
+import freesql.core.FreeSqlCursor
 import freesql.model.ColumnInfo
 import freesql.model.TableInfo
 import freesql.model.IndexInfo
-import java.sql.ResultSet
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -97,32 +97,45 @@ abstract class CommonUtils {
     }
 
     /**
-     * Read a value from a ResultSet by column index, handling type conversion.
+     * Read a value from a FreeSqlCursor by column index, handling type conversion.
      */
-    fun readValue(rs: ResultSet, index: Int, targetType: KClass<*>): Any? {
-        val value = rs.getObject(index) ?: return null
+    fun readValue(cursor: FreeSqlCursor, index: Int, targetType: KClass<*>): Any? {
+        val value = cursor.getObject(index) ?: return null
         return when {
-            targetType == Boolean::class -> rs.getBoolean(index)
-            targetType == Byte::class -> rs.getByte(index)
-            targetType == Short::class -> rs.getShort(index)
-            targetType == Int::class -> rs.getInt(index)
-            targetType == Long::class -> rs.getLong(index)
-            targetType == Float::class -> rs.getFloat(index)
-            targetType == Double::class -> rs.getDouble(index)
-            targetType == String::class -> rs.getString(index)
-            targetType == ByteArray::class -> rs.getBytes(index)
+            targetType == Boolean::class -> cursor.getBoolean(index)
+            targetType == Byte::class -> (value as? Number)?.toByte() ?: value
+            targetType == Short::class -> (value as? Number)?.toShort() ?: value
+            targetType == Int::class -> cursor.getInt(index)
+            targetType == Long::class -> cursor.getLong(index)
+            targetType == Float::class -> cursor.getFloat(index)
+            targetType == Double::class -> cursor.getDouble(index)
+            targetType == String::class -> cursor.getString(index)
+            targetType == ByteArray::class -> value as? ByteArray
             targetType == UUID::class -> {
-                val str = rs.getString(index)
+                val str = cursor.getString(index)
                 if (str != null) UUID.fromString(str) else null
             }
-            targetType == java.math.BigDecimal::class -> rs.getBigDecimal(index)
+            targetType == java.math.BigDecimal::class -> {
+                when (value) {
+                    is java.math.BigDecimal -> value
+                    is Number -> java.math.BigDecimal.valueOf(value.toDouble())
+                    else -> value
+                }
+            }
             targetType == LocalDateTime::class -> {
-                val ts = rs.getTimestamp(index)
-                if (ts != null) ts.toLocalDateTime() else null
+                when (value) {
+                    is LocalDateTime -> value
+                    is String -> LocalDateTime.parse(value)
+                    else -> value
+                }
             }
             targetType == Instant::class -> {
-                val ts = rs.getTimestamp(index)
-                if (null != ts) ts.toInstant() else null
+                when (value) {
+                    is Instant -> value
+                    is LocalDateTime -> value.atZone(ZoneId.systemDefault()).toInstant()
+                    is String -> LocalDateTime.parse(value).atZone(ZoneId.systemDefault()).toInstant()
+                    else -> value
+                }
             }
             else -> value
         }

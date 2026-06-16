@@ -1,5 +1,6 @@
 package freesql.provider.sqlite.curd
 
+import freesql.core.IAdo
 import freesql.core.IInsertOrUpdate
 import freesql.model.TableInfo
 import freesql.provider.sqlite.*
@@ -22,7 +23,7 @@ import kotlin.reflect.full.memberProperties
  */
 class SqliteInsertOrUpdate<T : Any>(
     private val entityType: KClass<T>,
-    private val ado: SqliteAdo,
+    private val ado: IAdo,
     private val utils: SqliteUtils,
     private val codeFirst: SqliteCodeFirst
 ) : IInsertOrUpdate<T> {

@@ -382,7 +382,7 @@ fun main()
 		orm.ado.executeReader("SELECT name FROM users ORDER BY name") { rs->
 			while (rs.next())
 			{
-				names.add(rs.getString("name"))
+				names.add(rs.getString(rs.getColumnIndex("name")) ?: "")
 			}
 		}
 		check(names.isNotEmpty())
@@ -1755,8 +1755,8 @@ fun main()
 		orm.ado.executeReader("SELECT name, email FROM users LIMIT 1") { rs->
 			if (rs.next())
 			{
-				nameFound = rs.getString("name") != null
-				emailFound = rs.getString("email") != null
+				nameFound = rs.getString(rs.getColumnIndex("name")) != null
+				emailFound = rs.getString(rs.getColumnIndex("email")) != null
 			}
 		}
 		check(nameFound) { "Should read name column" }

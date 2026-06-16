@@ -1,9 +1,8 @@
 package freesql.provider.sqlite
 
+import freesql.core.FreeSqlCursor
 import freesql.core.IAdo
 import freesql.core.IAop
-import java.sql.Connection
-import java.sql.ResultSet
 import java.sql.Types
 
 /**
@@ -22,7 +21,7 @@ class SqliteAdo(
 ) : IAdo {
 
     /** Set by the provider after construction. */
-    var aop: IAop? = null
+    override var aop: IAop? = null
 
     init {
         Class.forName("org.sqlite.JDBC")
@@ -94,19 +93,22 @@ class SqliteAdo(
     override fun executeReader(
         sql: String,
         parameters: Map<String, Any?>,
-        consumer: (ResultSet) -> Unit
+        consumer: (FreeSqlCursor) -> Unit
     ) {
         val (posSql, values) = positionalSql(sql, parameters)
         val pooled = pool.acquire()
         try {
             val stmt = pooled.connection.prepareStatement(posSql)
-            stmt.use { s ->
-                values.forEachIndexed { i, v ->
-                    if (v == null) s.setNull(i + 1, Types.NULL)
-                    else s.setObject(i + 1, v)
+            stmt.use { statement ->
+                values.forEachIndexed { index, value ->
+                    if (value == null) statement.setNull(index + 1, Types.NULL)
+                    else statement.setObject(index + 1, value)
                 }
-                val rs = s.executeQuery()
-                rs.use { consumer(it) }
+                val rs = statement.executeQuery()
+                rs.use { resultSet ->
+                    val cursor = JdbcFreeSqlCursor(resultSet)
+                    consumer(cursor)
+                }
             }
         } finally {
             pool.release(pooled)
@@ -161,13 +163,13 @@ class SqliteAdo(
         parameters: Map<String, Any?>
     ): List<Map<String, Any?>> {
         val results = mutableListOf<Map<String, Any?>>()
-        executeReader(sql, parameters) { rs ->
-            val meta = rs.metaData
+        executeReader(sql, parameters) { cursor ->
+            val meta = cursor.metaData
             val colCount = meta.columnCount
-            while (rs.next()) {
+            while (cursor.next()) {
                 val row = mutableMapOf<String, Any?>()
                 for (i in 1..colCount) {
-                    row[meta.getColumnLabel(i)] = rs.getObject(i)
+                    row[meta.getColumnLabel(i)] = cursor.getObject(i)
                 }
                 results.add(row)
             }
@@ -178,12 +180,12 @@ class SqliteAdo(
     override fun <T : Any> executeArray(
         sql: String,
         parameters: Map<String, Any?>,
-        mapper: (ResultSet) -> T
+        mapper: (FreeSqlCursor) -> T
     ): List<T> {
         val results = mutableListOf<T>()
-        executeReader(sql, parameters) { rs ->
-            while (rs.next()) {
-                results.add(mapper(rs))
+        executeReader(sql, parameters) { cursor ->
+            while (cursor.next()) {
+                results.add(mapper(cursor))
             }
         }
         return results

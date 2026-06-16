@@ -197,7 +197,7 @@ abstract class SchemaTests : FreeSqlTestBase() {
             ).executeAffrows()
 
             val names = orm.ado.executeArray("SELECT name FROM users") { rs ->
-                rs.getString("name")
+                rs.getString(rs.getColumnIndex("name")) ?: ""
             }
             assertTrue(names.contains("MapperTest"))
         }

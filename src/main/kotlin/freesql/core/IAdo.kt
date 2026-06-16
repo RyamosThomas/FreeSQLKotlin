@@ -1,18 +1,19 @@
 package freesql.core
 
-import java.sql.ResultSet
-
 /**
  * Low-level database access interface.
  * Port of FreeSql IAdo.
  */
 interface IAdo {
 
-    /** Execute a query and iterate over the ResultSet. */
+    /** AOP hooks for intercepting database operations. */
+    var aop: IAop?
+
+    /** Execute a query and iterate over the cursor. */
     fun executeReader(
         sql: String,
         parameters: Map<String, Any?> = emptyMap(),
-        consumer: (ResultSet) -> Unit
+        consumer: (FreeSqlCursor) -> Unit
     )
 
     /** Execute a non-query and return affected rows. */
@@ -37,7 +38,7 @@ interface IAdo {
     fun <T : Any> executeArray(
         sql: String,
         parameters: Map<String, Any?> = emptyMap(),
-        mapper: (ResultSet) -> T
+        mapper: (FreeSqlCursor) -> T
     ): List<T>
 
     /** Run [action] inside a database transaction. */
