@@ -218,6 +218,9 @@ class SqliteCodeFirst(
                 else if (isSyncStructureToUpper) rawColName.uppercase()
                 else rawColName
 
+            val colIsIdentity = fluentColConfig?.isIdentity
+                    ?: colAnnotation?.isIdentity ?: false
+
             val colAttr = ColumnAttribute(
                 dbName = colDbName,
                 dbOldName = colAnnotation?.oldName ?: "",
@@ -225,8 +228,7 @@ class SqliteCodeFirst(
                     ?: colAnnotation?.dbType ?: "",
                 isPrimary = fluentColConfig?.isPrimary
                     ?: colAnnotation?.isPrimary ?: false,
-                isIdentity = fluentColConfig?.isIdentity
-                    ?: colAnnotation?.isIdentity ?: false,
+                isIdentity = colIsIdentity,
                 isNullable = fluentColConfig?.isNullable
                     ?: colAnnotation?.isNullable ?: isNullable,
                 isIgnore = false,
@@ -236,7 +238,8 @@ class SqliteCodeFirst(
                 precision = colAnnotation?.precision ?: 0,
                 scale = colAnnotation?.scale ?: 0,
                 canInsert = fluentColConfig?.canInsert
-                    ?: colAnnotation?.canInsert ?: true,
+                    ?: colAnnotation?.canInsert
+                    ?: !colIsIdentity,
                 canUpdate = fluentColConfig?.canUpdate
                     ?: colAnnotation?.canUpdate ?: true,
                 insertValueSql = fluentColConfig?.insertValueSql?.ifEmpty { null }

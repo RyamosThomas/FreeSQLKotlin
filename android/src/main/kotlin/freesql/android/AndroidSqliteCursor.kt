@@ -4,6 +4,9 @@ import android.database.Cursor
 import freesql.core.FreeSqlCursor
 import freesql.core.FreeSqlCursorMetaData
 
+/**
+ * Adapts Android's 0-based [Cursor] to FreeSqlCursor's 1-based (JDBC-convention) API.
+ */
 class AndroidSqliteCursor(private val cursor: Cursor) : FreeSqlCursor
 {
     override val metaData: FreeSqlCursorMetaData = AndroidCursorMetaData(cursor)
@@ -14,33 +17,35 @@ class AndroidSqliteCursor(private val cursor: Cursor) : FreeSqlCursor
 
     override fun getObject(columnIndex: Int): Any?
     {
-        // Android Cursor doesn't have getObject; need to check type
-        // Use getType() API (available since API 11, min is 26)
-        return when (cursor.getType(columnIndex))
+        val androidIndex = columnIndex - 1
+        return when (cursor.getType(androidIndex))
         {
             Cursor.FIELD_TYPE_NULL -> null
-            Cursor.FIELD_TYPE_INTEGER -> cursor.getLong(columnIndex)
-            Cursor.FIELD_TYPE_FLOAT -> cursor.getDouble(columnIndex)
-            Cursor.FIELD_TYPE_STRING -> cursor.getString(columnIndex)
-            Cursor.FIELD_TYPE_BLOB -> cursor.getBlob(columnIndex)
-            else -> cursor.getString(columnIndex)
+            Cursor.FIELD_TYPE_INTEGER -> cursor.getLong(androidIndex)
+            Cursor.FIELD_TYPE_FLOAT -> cursor.getDouble(androidIndex)
+            Cursor.FIELD_TYPE_STRING -> cursor.getString(androidIndex)
+            Cursor.FIELD_TYPE_BLOB -> cursor.getBlob(androidIndex)
+            else -> cursor.getString(androidIndex)
         }
     }
 
-    override fun getString(columnIndex: Int): String? =
-        if (cursor.isNull(columnIndex)) null else cursor.getString(columnIndex)
+    override fun getString(columnIndex: Int): String?
+    {
+        val androidIndex = columnIndex - 1
+        return if (cursor.isNull(androidIndex)) null else cursor.getString(androidIndex)
+    }
 
-    override fun getInt(columnIndex: Int): Int = cursor.getInt(columnIndex)
+    override fun getInt(columnIndex: Int): Int = cursor.getInt(columnIndex - 1)
 
-    override fun getLong(columnIndex: Int): Long = cursor.getLong(columnIndex)
+    override fun getLong(columnIndex: Int): Long = cursor.getLong(columnIndex - 1)
 
-    override fun getDouble(columnIndex: Int): Double = cursor.getDouble(columnIndex)
+    override fun getDouble(columnIndex: Int): Double = cursor.getDouble(columnIndex - 1)
 
-    override fun getFloat(columnIndex: Int): Float = cursor.getFloat(columnIndex)
+    override fun getFloat(columnIndex: Int): Float = cursor.getFloat(columnIndex - 1)
 
-    override fun getBoolean(columnIndex: Int): Boolean = cursor.getInt(columnIndex) != 0
+    override fun getBoolean(columnIndex: Int): Boolean = cursor.getInt(columnIndex - 1) != 0
 
-    override fun isNull(columnIndex: Int): Boolean = cursor.isNull(columnIndex)
+    override fun isNull(columnIndex: Int): Boolean = cursor.isNull(columnIndex - 1)
 
     override fun getColumnIndex(columnName: String): Int
     {
@@ -51,10 +56,13 @@ class AndroidSqliteCursor(private val cursor: Cursor) : FreeSqlCursor
             val dotIndex = columnName.lastIndexOf('.')
             if (dotIndex >= 0)
             {
-                return cursor.getColumnIndex(columnName.substring(dotIndex + 1))
+                val strippedIndex = cursor.getColumnIndex(columnName.substring(dotIndex + 1))
+                // Android returns 0-based; convert to 1-based for FreeSqlCursor convention
+                return if (strippedIndex >= 0) strippedIndex + 1 else strippedIndex
             }
         }
-        return index
+        // Android returns 0-based; convert to 1-based for FreeSqlCursor convention
+        return if (index >= 0) index + 1 else index
     }
 }
 
@@ -63,6 +71,10 @@ private class AndroidCursorMetaData(
 ) : FreeSqlCursorMetaData
 {
     override val columnCount: Int get() = cursor.columnCount
-    override fun getColumnLabel(columnIndex: Int): String = cursor.getColumnName(columnIndex)
-    override fun getColumnName(columnIndex: Int): String = cursor.getColumnName(columnIndex)
+
+    override fun getColumnLabel(columnIndex: Int): String =
+        cursor.getColumnName(columnIndex - 1)
+
+    override fun getColumnName(columnIndex: Int): String =
+        cursor.getColumnName(columnIndex - 1)
 }
