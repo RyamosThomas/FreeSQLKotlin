@@ -238,8 +238,7 @@ class SqliteCodeFirst(
                 precision = colAnnotation?.precision ?: 0,
                 scale = colAnnotation?.scale ?: 0,
                 canInsert = fluentColConfig?.canInsert
-                    ?: colAnnotation?.canInsert
-                    ?: !colIsIdentity,
+                    ?: if (colIsIdentity) false else (colAnnotation?.canInsert ?: true),
                 canUpdate = fluentColConfig?.canUpdate
                     ?: colAnnotation?.canUpdate ?: true,
                 insertValueSql = fluentColConfig?.insertValueSql?.ifEmpty { null }
