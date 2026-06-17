@@ -179,7 +179,7 @@ class AndroidSqliteAdo(
             while (cursor.next())
             {
                 val row = mutableMapOf<String, Any?>()
-                for (columnIndex in 0 until colCount)
+                for (columnIndex in 1 .. colCount)
                 {
                     row[meta.getColumnLabel(columnIndex)] = cursor.getObject(columnIndex)
                 }
